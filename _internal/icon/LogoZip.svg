@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0" style="stop-color:#1E88E5;stop-opacity:1"/>
+      <stop offset="1" style="stop-color:#039BE5;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset result="offOut" in="SourceAlpha" dx="2" dy="2"/>
+      <feGaussianBlur result="blurOut" in="offOut" stdDeviation="2"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.2"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="drop-shadow-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="drop-shadow 1 10 10 0 0.5 rgba(0,0,0,0.3)">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0"/>
+      <feOffset dx="10" dy="10"/>
+      <feComponentTransfer result="offsetblur">
+        <feFuncA id="spread-ctrl" type="linear" slope="1"/>
+      </feComponentTransfer>
+      <feFlood flood-color="rgba(0,0,0,0.3)"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="drop-shadow-filter-1" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="drop-shadow 1 10 10 0 0.5 rgba(0,0,0,0.3)">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0"/>
+      <feOffset dx="10" dy="10"/>
+      <feComponentTransfer result="offsetblur">
+        <feFuncA id="spread-ctrl" type="linear" slope="1"/>
+      </feComponentTransfer>
+      <feFlood flood-color="rgba(0,0,0,0.3)"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="duotone-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="duotone 1 #bd0b91 #fcbb0d 1">
+      <feColorMatrix type="matrix" result="grayscale" values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 1 0"/>
+      <feComponentTransfer color-interpolation-filters="sRGB">
+        <feFuncR type="gamma" exponent="1.5" amplitude="1" offset="0"/>
+        <feFuncG type="gamma" exponent="1.5" amplitude="1" offset="0"/>
+        <feFuncB type="gamma" exponent="1.5" amplitude="1" offset="0"/>
+      </feComponentTransfer>
+      <feComponentTransfer color-interpolation-filters="sRGB" result="duotone">
+        <feFuncR type="table" tableValues="0.741 0.988"/>
+        <feFuncG type="table" tableValues="0.043 0.733"/>
+        <feFuncB type="table" tableValues="0.569 0.051"/>
+        <feFuncA type="table" tableValues="0 1"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect x="197.553" y="170.525" width="111.211" height="108.842" rx="24" ry="24" fill="url(#bgGradient)" filter="url(#shadow)" style=""/>
+  <rect x="203.423" y="229.425" width="103.185" height="47.053" rx="24" ry="24" fill="#FFFFFF" opacity="0.1" style=""/>
+  <rect x="200.579" y="176.05" width="105.948" height="43.107" rx="24" ry="24" fill="#FFFFFF" opacity="0.1" style=""/>
+  <g transform="matrix(0.927639, 0, 0, 0.868436, 200.527771, 197.050049)" style="filter: url('#shadow') url('#drop-shadow-filter-1');">
+    <path d="M0,0 h30 l10,10 v50 h-40 v-60 z" fill="#FFFFFF"/>
+    <path d="M30,0 v10 h10 l-10,-10" fill="#E1E1E1"/>
+    <path d="M30,0 v10 h10" fill="none" stroke="#BDBDBD" stroke-width="0.5"/>
+    <text x="5" y="15" font-family="Courier, monospace" font-size="5" fill="#0277BD" style="white-space: pre;">INFO</text>
+    <text x="5" y="25" font-family="Courier, monospace" font-size="5" fill="#0277BD" style="white-space: pre;">DEBUG</text>
+    <text x="5" y="35" font-family="Courier, monospace" font-size="5" fill="#0277BD" style="white-space: pre;">WARN</text>
+    <text x="5" y="45" font-family="Courier, monospace" font-size="5" fill="#0277BD" style="white-space: pre;">ERROR</text>
+    <text x="5" y="55" font-family="Courier, monospace" font-size="5" fill="#0277BD" style="white-space: pre;">FILE.LOG</text>
+  </g>
+  <path d="M 240.792 224.287 L 248.319 224.287 L 248.319 220.603 L 259.608 227.972 L 248.319 235.341 L 248.319 231.656 L 240.792 231.656 L 240.792 224.287 Z" fill="#FFFFFF" filter="url(#shadow)" style=""/>
+  <g transform="matrix(0.917773, 0, 0, 0.899134, 260.659363, 198.497238)" style="filter: url('#shadow') url('#drop-shadow-filter-0') url('#duotone-filter-0');">
+    <rect x="0" y="0" width="40" height="60" rx="5" ry="5" fill="#FFFFFF"/>
+    <text x="10" y="55" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#0277BD" style="white-space: pre;">ZIP</text>
+    <path d="M5,5 h30 v2 h-30 z" fill="#FFFFFF" opacity="0.3"/>
+    <path d="M5,5 v50 h2 v-50 z" fill="#FFFFFF" opacity="0.3"/>
+  </g>
+</svg>
