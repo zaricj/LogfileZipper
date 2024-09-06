@@ -8,7 +8,7 @@ from PySide6.QtGui import QIcon, QAction, QStandardItemModel, QStandardItem, QCl
 from PySide6.QtCore import Qt, QThread, Signal, Slot, QSortFilterProxyModel, QObject, QTimer, QDir
 from pathlib import Path
 import re
-import py7zr
+import zipfile
 import os
 import sys
 
@@ -17,33 +17,51 @@ class Worker(QObject):
     log_message = Signal(str)
     finished = Signal()
 
-    def __init__(self, input_folder, output_folder, patterns):
+    def __init__(self, input_folder, output_folder, patterns, compression_methods):
         super().__init__()
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.patterns = patterns
+        self.compression_methods = compression_methods
+        
+        if self.compression_methods == "zlib (Fast)":
+            self.compression_method = zipfile.ZIP_DEFLATED
+        elif self.compression_methods == "bz2 (Good)":
+            self.compression_method = zipfile.ZIP_BZIP2
+        elif self.compression_methods == "lzma (Highest)":
+            self.compression_method = zipfile.ZIP_LZMA
+
 
     def run(self):
         try:
+            counter = 0
+            
             for pattern in self.patterns:
+                counter += 1
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
                 matching_files = [f for f in os.listdir(self.input_folder) if re.match(regex, f)]
                 total_files = len(matching_files)
+                self.log_message.emit(f"Currently selected compression method: {self.compression_methods}") # TODO Display correctly
+                creating_archive_message = f"Creating archive {pattern.replace('*', '')}.7z ({counter}/{len(self.patterns)})"
+                self.log_message.emit(creating_archive_message)
+                self.log_message.emit(len(creating_archive_message) * "-")
                 if matching_files:
                     zip_filename = f"{pattern.replace('*', '')}.7z"
                     zip_path = os.path.join(self.output_folder, zip_filename)
-                    
-                    with py7zr.SevenZipFile(zip_path, "w") as zipf:
+                    self.log_message.emit("Starting processing of log files...")
+                    with zipfile.ZipFile(zip_path, "w", compression=self.compression_method) as zipf:
                         for index, file in enumerate(matching_files):
                             file_path = os.path.join(self.input_folder, file)
-                            zipf.write(file_path, file)
+                            zipf.write(file_path, arcname=file)
                             self.log_message.emit(f"Processing file {file}")
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
 
-                    self.log_message.emit(f"Created Archive: {zip_filename} with {len(matching_files)} files\nDeleted {len(matching_files)} log files that were zipped.")
+                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files\nDeleted {len(matching_files)} log files that were zipped."
+                    self.log_message.emit(task_compelte_message)
+                    self.log_message.emit(len(task_compelte_message) * "-")
                 else:
-                    self.log_message.emit(f"No files found matching: {pattern}")
+                    self.log_message.emit(f"No files found matching pattern(s): {pattern}")
             
             self.finished.emit()
         except Exception as e:
@@ -54,7 +72,7 @@ class RegexGeneratorDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Regex Generator and Tester")
-        self.setWindowIcon(QIcon("_internal\icon\logo.ico"))
+        self.setWindowIcon(QIcon("_internal\\icon\\logo.ico"))
         self.setGeometry(100, 100, 600, 400)
         self.initUI()
 
@@ -134,7 +152,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Log File Zipper")
-        self.setWindowIcon(QIcon("_internal\icon\logo.ico"))
+        self.setWindowIcon(QIcon("_internal\\icon\\logo.ico"))
         self.setGeometry(500, 250, 1000, 700)
         self.saveGeometry()
         self.initUI()
@@ -184,14 +202,24 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.pattern_input)
         
         buttons_layout = QHBoxLayout()
+        
+        # Compression CombBox
+        self.compression_method_combobox = QComboBox() #zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA
+        self.compression_method_combobox.addItems(["zlib (Fast)", "bz2 (Good)", "lzma (Highest)"])
+        compression_method_combobox_label = QLabel("Compression method:")
+        self.compression_method_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
+        buttons_layout.addWidget(compression_method_combobox_label)
+        buttons_layout.addWidget(self.compression_method_combobox)
         # Zip button
         zip_button = QPushButton("Start Zipping Log Files")
+        zip_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         zip_button.clicked.connect(self.zip_log_files)
         buttons_layout.addWidget(zip_button)
 
         # Open Regex Generator button
         regex_button = QPushButton("Open Regex Generator")
+        regex_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         regex_button.clicked.connect(self.open_regex_generator)
         buttons_layout.addWidget(regex_button)
         
@@ -288,6 +316,10 @@ class MainWindow(QMainWindow):
     
     # ====== Functions Start ====== #
     
+    def compression_methods(self):
+        compression_methods = ["zlib (Deflate)", "bz2 (Bzip2)", "lzma (LZMA/XZ)"]
+        return compression_methods
+    
     def update_progress(self, value):
         self.progress_bar.setValue(value)
     
@@ -354,7 +386,9 @@ class MainWindow(QMainWindow):
     def zip_log_files(self):
         input_folder = self.input_folder.text()
         output_folder = self.output_folder.text()
+        compression_methods = self.compression_method_combobox.currentText()  
         patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
+        
         
         if not input_folder or not output_folder or not patterns:
             QMessageBox.warning(self, "Error", "Please fill in all fields.")
@@ -372,7 +406,7 @@ class MainWindow(QMainWindow):
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(input_folder, output_folder, patterns)
+        self.worker = Worker(input_folder, output_folder, patterns, compression_methods)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
