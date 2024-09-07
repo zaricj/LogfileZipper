@@ -1,2 +1,8 @@
-# LogfileZipper
- Zip Searches for log files by using filename patterns , zips and compresses them.
+# Logfile Bulk Zipper
+
+
+
+## Demo GIF
+
+![Demo](docs/images/LogfileZipperDemo.gif)
+
