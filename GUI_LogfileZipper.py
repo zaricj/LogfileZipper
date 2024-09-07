@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
             return
         
         if not os.path.exists(output_folder):
-            reply = QMessageBox.critical(self,"Error", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.warning(self,"Warning", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             # Check the user's response
             if reply == QMessageBox.Yes:
