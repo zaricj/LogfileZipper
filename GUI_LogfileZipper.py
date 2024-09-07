@@ -17,35 +17,37 @@ class Worker(QObject):
     log_message = Signal(str)
     finished = Signal()
 
-    def __init__(self, input_folder, output_folder, patterns, compression_methods):
+    def __init__(self, input_folder, output_folder, patterns, compression_method):
         super().__init__()
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.patterns = patterns
-        self.compression_methods = compression_methods
+        self.compression_method_text = compression_method  
         
-        if self.compression_methods == "zlib (Fast)":
+        if compression_method  == "zlib (Fast)":
             self.compression_method = zipfile.ZIP_DEFLATED
-        elif self.compression_methods == "bz2 (Good)":
+        elif compression_method  == "bz2 (Good)":
             self.compression_method = zipfile.ZIP_BZIP2
-        elif self.compression_methods == "lzma (Highest)":
+        elif compression_method  == "lzma (Highest)":
             self.compression_method = zipfile.ZIP_LZMA
 
 
     def run(self):
         try:
-            counter = 0
-            
+            counter = 0 # Counter to display compressing archive 1 out of n
+            self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
             for pattern in self.patterns:
-                counter += 1
+                counter += 1 # Updating the counter
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
                 matching_files = [f for f in os.listdir(self.input_folder) if re.match(regex, f)]
                 total_files = len(matching_files)
-                self.log_message.emit(f"Currently selected compression method: {self.compression_methods}") # TODO Display correctly
-                creating_archive_message = f"Creating archive {pattern.replace('*', '')}.7z ({counter}/{len(self.patterns)})"
-                self.log_message.emit(creating_archive_message)
-                self.log_message.emit(len(creating_archive_message) * "-")
                 if matching_files:
+                    # Print processing message
+                    creating_archive_message = f"Creating archive {pattern.replace('*', '')}.7z ({counter}/{len(self.patterns)})"
+                    self.log_message.emit(len(creating_archive_message) * "-")
+                    self.log_message.emit(creating_archive_message)
+                    self.log_message.emit(len(creating_archive_message) * "-")
+                    # Continue processing
                     zip_filename = f"{pattern.replace('*', '')}.7z"
                     zip_path = os.path.join(self.output_folder, zip_filename)
                     self.log_message.emit("Starting processing of log files...")
@@ -57,10 +59,11 @@ class Worker(QObject):
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
 
-                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files\nDeleted {len(matching_files)} log files that were zipped."
+                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
                     self.log_message.emit(task_compelte_message)
-                    self.log_message.emit(len(task_compelte_message) * "-")
+                    self.log_message.emit(len(creating_archive_message) * "-")
                 else:
+                    self.log_message.emit("")
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
             
             self.finished.emit()
@@ -177,9 +180,9 @@ class MainWindow(QMainWindow):
         self.input_folder.textChanged.connect(self.update_log_files_count)
         input_folder_layout = QHBoxLayout()
         input_folder_layout.addWidget(self.input_folder)
-        input_folder_button = QPushButton("Browse")
-        input_folder_button.clicked.connect(self.browse_input_folder)
-        input_folder_layout.addWidget(input_folder_button)
+        self.input_folder_button = QPushButton("Browse")
+        self.input_folder_button.clicked.connect(self.browse_input_folder)
+        input_folder_layout.addWidget(self.input_folder_button)
         layout.addWidget(QLabel("Input Folder:"))
         layout.addLayout(input_folder_layout)
 
@@ -188,9 +191,9 @@ class MainWindow(QMainWindow):
         self.output_folder.setPlaceholderText("Choose a folder where to save the zipped archives...")
         output_folder_layout = QHBoxLayout()
         output_folder_layout.addWidget(self.output_folder)
-        output_folder_button = QPushButton("Browse")
-        output_folder_button.clicked.connect(self.browse_output_folder)
-        output_folder_layout.addWidget(output_folder_button)
+        self.output_folder_button = QPushButton("Browse")
+        self.output_folder_button.clicked.connect(self.browse_output_folder)
+        output_folder_layout.addWidget(self.output_folder_button)
         layout.addWidget(QLabel("Output Folder:"))
         layout.addLayout(output_folder_layout)
         
@@ -204,24 +207,25 @@ class MainWindow(QMainWindow):
         buttons_layout = QHBoxLayout()
         
         # Compression CombBox
-        self.compression_method_combobox = QComboBox() #zipfile.ZIP_DEFLATED, zipfile.ZIP_BZIP2, zipfile.ZIP_LZMA
-        self.compression_method_combobox.addItems(["zlib (Fast)", "bz2 (Good)", "lzma (Highest)"])
+        self.compression_method_combobox = QComboBox()
         compression_method_combobox_label = QLabel("Compression method:")
+        self.compression_method_combobox.addItems(["zlib (Fast)", "bz2 (Good)", "lzma (Highest)"])
         self.compression_method_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         buttons_layout.addWidget(compression_method_combobox_label)
         buttons_layout.addWidget(self.compression_method_combobox)
+        
         # Zip button
-        zip_button = QPushButton("Start Zipping Log Files")
-        zip_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        zip_button.clicked.connect(self.zip_log_files)
-        buttons_layout.addWidget(zip_button)
+        self.zip_button = QPushButton("Start Zipping Log Files")
+        self.zip_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.zip_button.clicked.connect(self.zip_log_files)
+        buttons_layout.addWidget(self.zip_button)
 
         # Open Regex Generator button
-        regex_button = QPushButton("Open Regex Generator")
-        regex_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        regex_button.clicked.connect(self.open_regex_generator)
-        buttons_layout.addWidget(regex_button)
+        self.regex_button = QPushButton("Open Regex Generator")
+        self.regex_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.regex_button.clicked.connect(self.open_regex_generator)
+        buttons_layout.addWidget(self.regex_button)
         
         layout.addLayout(buttons_layout)
 
@@ -247,6 +251,7 @@ class MainWindow(QMainWindow):
         program_output_vertical_layout = QVBoxLayout()
         self.program_output_label = QLabel("Program Output:")
         self.program_output = QTextEdit()
+        self.program_output.setReadOnly(True)
         program_output_vertical_layout.addWidget(self.program_output_label)
         program_output_vertical_layout.addWidget(self.program_output)
 
@@ -279,6 +284,8 @@ class MainWindow(QMainWindow):
         self.tree_view.setHeaderHidden(False)   # Show the header
         self.tree_view.setSortingEnabled(True)  # Enable sorting
         
+        # Combobox signal state changed
+        self.compression_method_combobox.currentTextChanged.connect(self.get_compression_method)
     
     def closeEvent(self, event: QCloseEvent):
         reply = QMessageBox.question(self, "Exit Program", "Are you sure you want to exit the program?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -316,16 +323,52 @@ class MainWindow(QMainWindow):
     
     # ====== Functions Start ====== #
     
-    def compression_methods(self):
-        compression_methods = ["zlib (Deflate)", "bz2 (Bzip2)", "lzma (LZMA/XZ)"]
-        return compression_methods
-    
     def update_progress(self, value):
         self.progress_bar.setValue(value)
     
     def clear_output(self):
         self.program_output.clear()
-    
+        
+    def get_compression_method(self):
+        combobox_text = self.compression_method_combobox.currentText()
+        if combobox_text == "zlib (Fast)":
+            desc_txt = """
+        Pros:
+            Fast compression and decompression.
+            Widely supported across many platforms and programming languages.
+            Provides a good balance between compression speed and compression ratio.
+        Cons:
+            The compression ratio is generally lower than bz2 and lzma.
+            
+        Best for: General use cases where compatibility, speed, and reasonable compression are needed (e.g., web transfers, archives)."""
+        
+            self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
+        
+        elif combobox_text == "bz2 (Good)":
+            desc_txt = """
+        Pros:
+            Higher compression ratio than zlib for most files.
+            Good decompression speed.
+        Cons:
+            Slower compression speed compared to zlib.
+            
+        Best for: Situations where higher compression is desired and compression speed is less of a concern (e.g., backups, log files)."""
+
+            self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
+        
+        elif  combobox_text == "lzma (Highest)":
+            desc_txt = """
+        Pros:
+            Achieves the highest compression ratio among the three methods.
+            Good choice for very large files or when maximum compression is necessary.
+        Cons:
+            Slower compression and decompression speed.
+            Consumes more memory during compression.
+            
+        Best for: Cases where maximum compression is essential, and speed or memory usage is not critical (e.g., distributing software packages, compressing large datasets)."""
+            
+            self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
+            
     # Open Log files input folder 
     def open_input_folder(self):
         directory_path = self.input_folder.text()
@@ -386,9 +429,8 @@ class MainWindow(QMainWindow):
     def zip_log_files(self):
         input_folder = self.input_folder.text()
         output_folder = self.output_folder.text()
-        compression_methods = self.compression_method_combobox.currentText()  
+        compression_method = self.compression_method_combobox.currentText()  
         patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
-        
         
         if not input_folder or not output_folder or not patterns:
             QMessageBox.warning(self, "Error", "Please fill in all fields.")
@@ -399,14 +441,23 @@ class MainWindow(QMainWindow):
             return
         
         if not os.path.exists(output_folder):
-            QMessageBox.critical(self, "Error", f"Output folder does not exist: {output_folder}")
-            return
+            reply = QMessageBox.critical(self,"Error", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+            # Check the user's response
+            if reply == QMessageBox.Yes:
+                try:
+                    os.makedirs(output_folder)
+                    QMessageBox.information(self, "Success", f"Folder created: {output_folder}")
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to create folder: {e}")
+            else:
+                return
         
         self.program_output.clear()
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(input_folder, output_folder, patterns, compression_methods)
+        self.worker = Worker(input_folder, output_folder, patterns, compression_method)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
@@ -417,9 +468,19 @@ class MainWindow(QMainWindow):
         
         # Start the thread
         self.thread.start()
+        
+        # Disabled buttont on run
+        self.output_folder_button.setDisabled(True)
+        self.input_folder_button.setDisabled(True)
+        self.zip_button.setDisabled(True)
+        self.regex_button.setDisabled(True)
 
     def on_worker_finished(self):
         QMessageBox.information(self, "Success", "Zipping process completed.")
+        self.output_folder_button.setDisabled(False)
+        self.input_folder_button.setDisabled(False)
+        self.zip_button.setDisabled(False)
+        self.regex_button.setDisabled(False)
         self.progress_bar.reset()
         self.thread.quit()
         self.thread.wait()
@@ -455,6 +516,9 @@ class MainWindow(QMainWindow):
         }
         QPushButton:pressed {
             background-color: #0a3d91;
+        }
+        QPushButton:disabled {
+            background-color: #808080;
         }
         QTreeView::item:selected {
             background-color: #1565c0;
