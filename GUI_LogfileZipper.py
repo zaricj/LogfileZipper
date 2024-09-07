@@ -1,11 +1,9 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QTabWidget, QGroupBox, QLabel, 
-                             QLineEdit, QPushButton, QComboBox, QRadioButton, 
-                             QListWidget, QTextEdit, QProgressBar, QStatusBar,
-                             QCheckBox,QMenu,QFileDialog, QMessageBox, QFrame, 
-                             QSpacerItem, QSizePolicy, QTableView, QHeaderView, QInputDialog, QDialog, QTreeView, QFileSystemModel)
-from PySide6.QtGui import QIcon, QAction, QStandardItemModel, QStandardItem, QCloseEvent, QTextCursor, QIcon
-from PySide6.QtCore import Qt, QThread, Signal, Slot, QSortFilterProxyModel, QObject, QTimer, QDir
+                             QHBoxLayout, QLabel, 
+                             QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar,
+                             QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel)
+from PySide6.QtGui import QAction, QCloseEvent, QIcon
+from PySide6.QtCore import QThread, Signal, QObject, QDir
 from pathlib import Path
 import re
 import zipfile
@@ -59,11 +57,9 @@ class Worker(QObject):
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
 
-                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
+                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
                     self.log_message.emit(task_compelte_message)
-                    self.log_message.emit(len(creating_archive_message) * "-")
                 else:
-                    self.log_message.emit("")
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
             
             self.finished.emit()
