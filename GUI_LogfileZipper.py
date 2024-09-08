@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar,
                              QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel)
-from PySide6.QtGui import QAction, QCloseEvent, QIcon
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QDropEvent
 from PySide6.QtCore import QThread, Signal, QObject, QDir
 from pathlib import Path
 import re
@@ -67,6 +67,32 @@ class Worker(QObject):
             self.log_message.emit(f"An error occurred: {str(e)}")
             self.finished.emit()
 
+class DraggableLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)  # Enable dropping on QLineEdit
+
+    def dragEnterEvent(self, event: QDropEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()  # Accept the drag event
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: QDropEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()  # Accept the drag move event
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent):
+        if event.mimeData().hasUrls():
+            # Extract the file path from the drop event
+            file_path = event.mimeData().urls()[0].toLocalFile()
+            self.setText(file_path)
+            event.acceptProposedAction()  # Accept the drop event
+        else:
+            event.ignore()
+
 class RegexGeneratorDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,10 +105,10 @@ class RegexGeneratorDialog(QDialog):
         layout = QVBoxLayout()
 
         # Input for log file patterns
-        self.pattern_input = QLineEdit()
-        self.pattern_input.setPlaceholderText("Enter log file patterns (comma-separated)")
+        self.patter_input_generator = QLineEdit()
+        self.patter_input_generator.setPlaceholderText("Enter log file patterns (comma-separated)")
         layout.addWidget(QLabel("Log File Patterns (separate multiple entries using commas):"))
-        layout.addWidget(self.pattern_input)
+        layout.addWidget(self.patter_input_generator)
 
         # Generate Regex button
         self.generate_button = QPushButton("Generate Regex")
@@ -115,7 +141,7 @@ class RegexGeneratorDialog(QDialog):
         self.setLayout(layout)
 
     def generate_regex(self):
-        patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
+        patterns = [p.strip() for p in self.patter_input_generator.text().split(',') if p.strip()]
         if not patterns:
             self.regex_display.setText("")
             return
@@ -150,15 +176,16 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Log File Zipper")
+        self.setWindowTitle("Log Archiver v1.1")
         self.setWindowIcon(QIcon("_internal\\icon\\logo.ico"))
         self.setGeometry(500, 250, 1000, 700)
         self.saveGeometry()
         self.initUI()
         
+        # Create the menu bar
         self.create_menu_bar()
         
-         # Apply the custom dark theme
+        # Apply the custom dark theme
         self.apply_custom_dark_theme()
         
     def initUI(self):
@@ -195,8 +222,9 @@ class MainWindow(QMainWindow):
         
         
         # Input for log file patterns
-        self.pattern_input = QLineEdit()
+        self.pattern_input = DraggableLineEdit()
         self.pattern_input.setPlaceholderText("Enter log file patterns (comma-separated)")
+        self.pattern_input.setClearButtonEnabled(True)
         layout.addWidget(QLabel("Log File Patterns (comma-separated):"))
         layout.addWidget(self.pattern_input)
         
@@ -268,12 +296,12 @@ class MainWindow(QMainWindow):
 
         # Set up the file system model
         self.file_system_model = QFileSystemModel(self)
-        self.file_system_model.setRootPath(QDir.rootPath())  # Set root path to the filesystem's root
+        self.file_system_model.setRootPath("")  # Set root path to the filesystem's root
         self.file_system_model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)  # Show all dirs and files
 
         # Set the model to the tree view
         self.tree_view.setModel(self.file_system_model)
-        self.tree_view.setRootIndex(self.file_system_model.index(QDir.homePath()))  # Set root index to the user's home directory
+        self.tree_view.setRootIndex(self.file_system_model.index(""))  # Set root index to the user's home directory
 
         # Optional: Customize the view
         self.tree_view.setColumnWidth(0, 250)  # Adjust column width
@@ -493,6 +521,10 @@ class MainWindow(QMainWindow):
         }
         QLabel {
             color: #ffffff;
+            font: bold;
+        }
+        QMenuBar {
+            border-bottom: 2px solid #0d47a1;
         }
         QLineEdit, QTextEdit, QTreeView {
             background-color: #3a3a3a;
