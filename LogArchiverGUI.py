@@ -30,8 +30,6 @@ class Worker(QObject):
         elif compression_method  == "lzma (Highest)":
             self.compression_method = zipfile.ZIP_LZMA
 
-        print(f"State of Checkbox: {self.delete_logfiles_checkbox}")
-
     def run(self):
         try:
             counter = 0 # Counter to display compressing archive 1 out of n
