@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar,
+                             QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar, QCheckBox,
                              QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QDropEvent
 from PySide6.QtCore import QThread, Signal, QObject, QDir
@@ -15,12 +15,13 @@ class Worker(QObject):
     log_message = Signal(str)
     finished = Signal()
 
-    def __init__(self, input_folder, output_folder, patterns, compression_method):
+    def __init__(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping):
         super().__init__()
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.patterns = patterns
         self.compression_method_text = compression_method  
+        self.delete_logfiles_checkbox = delete_logfiles_after_zipping
         
         if compression_method  == "zlib (Fast)":
             self.compression_method = zipfile.ZIP_DEFLATED
@@ -29,6 +30,7 @@ class Worker(QObject):
         elif compression_method  == "lzma (Highest)":
             self.compression_method = zipfile.ZIP_LZMA
 
+        print(f"State of Checkbox: {self.delete_logfiles_checkbox}")
 
     def run(self):
         try:
@@ -53,12 +55,19 @@ class Worker(QObject):
                         for index, file in enumerate(matching_files):
                             file_path = os.path.join(self.input_folder, file)
                             zipf.write(file_path, arcname=file)
+                            if self.delete_logfiles_checkbox:
+                                os.unlink(file_path) # Deletes zipped log files
                             self.log_message.emit(f"Processing file {file}")
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
-
-                    task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
-                    self.log_message.emit(task_compelte_message)
+                                
+                    if self.delete_logfiles_checkbox:
+                        task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
+                        self.log_message.emit(task_compelte_message)
+                    else:
+                        task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files."
+                        self.log_message.emit(task_compelte_message)
+                    
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
             
@@ -234,10 +243,12 @@ class MainWindow(QMainWindow):
         self.compression_method_combobox = QComboBox()
         compression_method_combobox_label = QLabel("Compression method:")
         self.compression_method_combobox.addItems(["zlib (Fast)", "bz2 (Good)", "lzma (Highest)"])
-        self.compression_method_combobox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        self.delete_logfiles_checkbox = QCheckBox("Delete log files after zipping?")
 
         buttons_layout.addWidget(compression_method_combobox_label)
         buttons_layout.addWidget(self.compression_method_combobox)
+        buttons_layout.addWidget(self.delete_logfiles_checkbox)
         
         # Zip button
         self.zip_button = QPushButton("Start Zipping Log Files")
@@ -359,7 +370,6 @@ class MainWindow(QMainWindow):
             desc_txt = """
         Pros:
             Fast compression and decompression.
-            Widely supported across many platforms and programming languages.
             Provides a good balance between compression speed and compression ratio.
         Cons:
             The compression ratio is generally lower than bz2 and lzma.
@@ -453,7 +463,8 @@ class MainWindow(QMainWindow):
     def zip_log_files(self):
         input_folder = self.input_folder.text()
         output_folder = self.output_folder.text()
-        compression_method = self.compression_method_combobox.currentText()  
+        compression_method = self.compression_method_combobox.currentText()
+        delete_logfiles_after_zipping = self.delete_logfiles_checkbox.isChecked()
         patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
         
         if not input_folder or not output_folder or not patterns:
@@ -481,7 +492,7 @@ class MainWindow(QMainWindow):
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(input_folder, output_folder, patterns, compression_method)
+        self.worker = Worker(input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
@@ -498,6 +509,7 @@ class MainWindow(QMainWindow):
         self.input_folder_button.setDisabled(True)
         self.zip_button.setDisabled(True)
         self.regex_button.setDisabled(True)
+        self.compression_method_combobox.setDisabled(True)
 
     def on_worker_finished(self):
         QMessageBox.information(self, "Success", "Zipping process completed.")
@@ -505,6 +517,7 @@ class MainWindow(QMainWindow):
         self.input_folder_button.setDisabled(False)
         self.zip_button.setDisabled(False)
         self.regex_button.setDisabled(False)
+        self.compression_method_combobox.setDisabled(False)
         self.progress_bar.reset()
         self.thread.quit()
         self.thread.wait()
@@ -522,9 +535,6 @@ class MainWindow(QMainWindow):
         QLabel {
             color: #ffffff;
             font: bold;
-        }
-        QMenuBar {
-            border-bottom: 2px solid #0d47a1;
         }
         QLineEdit, QTextEdit, QTreeView {
             background-color: #3a3a3a;
@@ -552,6 +562,7 @@ class MainWindow(QMainWindow):
             background-color: #1565c0;
         }
         QMenuBar {
+            border-bottom: 2px solid #0d47a1;
             background-color: #2b2b2b;
             color: #ffffff;
         }
