@@ -41,30 +41,30 @@ class Worker(QObject):
                 total_files = len(matching_files)
                 if matching_files:
                     # Print processing message
-                    creating_archive_message = f"Creating archive {pattern.replace('*', '')}.7z ({counter}/{len(self.patterns)})"
+                    creating_archive_message = f"Creating archive {pattern.replace('*', '')}.zip ({counter}/{len(self.patterns)})"
                     self.log_message.emit(len(creating_archive_message) * "-")
                     self.log_message.emit(creating_archive_message)
                     self.log_message.emit(len(creating_archive_message) * "-")
                     # Continue processing
-                    zip_filename = f"{pattern.replace('*', '')}.7z"
+                    zip_filename = f"{pattern.replace('*', '')}.zip"
                     zip_path = os.path.join(self.output_folder, zip_filename)
-                    self.log_message.emit("Starting processing of log files...")
+                    self.log_message.emit("Starting zipping of log files...")
                     with zipfile.ZipFile(zip_path, "w", compression=self.compression_method) as zipf:
                         for index, file in enumerate(matching_files):
                             file_path = os.path.join(self.input_folder, file)
                             zipf.write(file_path, arcname=file)
                             if self.delete_logfiles_checkbox:
                                 os.unlink(file_path) # Deletes zipped log files
-                            self.log_message.emit(f"Processing file {file}")
+                            self.log_message.emit(f"Zipping file {file}")
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
                                 
                     if self.delete_logfiles_checkbox:
-                        task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
-                        self.log_message.emit(task_compelte_message)
+                        task_complete_message = f"Task completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
+                        self.log_message.emit(task_complete_message)
                     else:
-                        task_compelte_message = f"Task completed - Created archive: {zip_filename} with {len(matching_files)} files."
-                        self.log_message.emit(task_compelte_message)
+                        task_complete_message = f"Task completed - Created archive '{zip_filename}' with {len(matching_files)} files."
+                        self.log_message.emit(task_complete_message)
                     
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
@@ -104,7 +104,7 @@ class RegexGeneratorDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Regex Generator and Tester")
-        self.setWindowIcon(QIcon("_internal\\icon\\logo.ico"))
+        self.setWindowIcon(QIcon("_internal\\icon\\zipzap.ico"))
         self.setGeometry(100, 100, 600, 400)
         self.initUI()
 
@@ -183,8 +183,8 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Log Archiver v1.1")
-        self.setWindowIcon(QIcon("_internal\\icon\\logo.ico"))
+        self.setWindowTitle("Logfile Zipper v1.0.2")
+        self.setWindowIcon(QIcon("_internal\\icon\\zipzap.ico"))
         self.setGeometry(500, 250, 1000, 700)
         self.saveGeometry()
         self.initUI()
@@ -502,20 +502,26 @@ class MainWindow(QMainWindow):
         # Start the thread
         self.thread.start()
         
-        # Disabled buttont on run
+        # Disabled button on run
         self.output_folder_button.setDisabled(True)
+        self.output_folder.setDisabled(True)
         self.input_folder_button.setDisabled(True)
+        self.input_folder.setDisabled(True)
         self.zip_button.setDisabled(True)
         self.regex_button.setDisabled(True)
         self.compression_method_combobox.setDisabled(True)
+        self.delete_logfiles_checkbox.setDisabled(True)
 
     def on_worker_finished(self):
         QMessageBox.information(self, "Success", "Zipping process completed.")
         self.output_folder_button.setDisabled(False)
+        self.output_folder.setDisabled(False)
         self.input_folder_button.setDisabled(False)
+        self.input_folder.setDisabled(False)
         self.zip_button.setDisabled(False)
         self.regex_button.setDisabled(False)
         self.compression_method_combobox.setDisabled(False)
+        self.delete_logfiles_checkbox.setDisabled(False)
         self.progress_bar.reset()
         self.thread.quit()
         self.thread.wait()
@@ -529,6 +535,8 @@ class MainWindow(QMainWindow):
         QWidget {
             background-color: #2b2b2b;
             color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
         }
         QLabel {
             color: #ffffff;
@@ -537,15 +545,21 @@ class MainWindow(QMainWindow):
         QLineEdit, QTextEdit, QTreeView {
             background-color: #3a3a3a;
             border: 1px solid #555555;
-            padding: 2px;
+            border-radius: 4px;
+            padding: 6px;
             color: #ffffff;
+        }
+        QLineEdit:focus, QTextEdit:focus, QTreeView:focus {
+            border-color: #0d47a1;
+            background-color: #3a3a3a;
         }
         QPushButton {
             background-color: #0d47a1;
             color: white;
-            border: none;
-            padding: 5px;
-            min-width: 80px;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-weight: 500;
+            min-width: 90px;
         }
         QPushButton:hover {
             background-color: #1565c0;
@@ -570,6 +584,8 @@ class MainWindow(QMainWindow):
         QMenu {
             background-color: #2b2b2b;
             color: #ffffff;
+            border: 1px solid #424242;
+            border-radius: 6px;
         }
         QMenu::item:selected {
             background-color: #1565c0;
@@ -580,8 +596,9 @@ class MainWindow(QMainWindow):
         }
         QProgressBar {
             border: 2px solid grey;
-            border-radius: 5px;
+            border-radius: 6px;
             text-align: center;
+            font-weight: 600;
             font: bold 
         }
         QProgressBar::chunk {
@@ -590,7 +607,7 @@ class MainWindow(QMainWindow):
             margin: 0.5px
         }
         """)
-        
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

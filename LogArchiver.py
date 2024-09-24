@@ -40,10 +40,10 @@ msg = r"""
  \  /\  /| | | |   < (_) | | | | | | | | | | |  __/ | | |
   \/  \/ |_|_|_|_|\_\___/|_| |_| |_|_| |_| |_|\___|_| |_|
                                                          
-"Ein CLI-Tool zum Komprimieren von Logdateien im 7z-Format. 
-Unterstützt werden nur Logdateien, die das Datum im Format yyyy-mm-dd im Dateinamen enthalten. 
+"Ein CLI-Tool zum Komprimieren von Logdateien im ZIP-Format. 
+Unterstützt werden nur Logdateien, die das Datum im Format yyyy_mm_dd im Dateinamen enthalten. 
 Beispiele für unterstützte Logs: 2024_03_20_server.log, 2024_08_27.adminrequest.log, 2024_08_03_message.log. 
-Die Logdateien werden nach dem Monat im Dateinamen gruppiert und für jeden Monat wird ein separates .7z-Archiv erstellt."    
+Die Logdateien werden nach dem Monat im Dateinamen gruppiert und für jeden Monat wird ein separates .zip-Archiv erstellt."    
 """
 
 print(msg)
@@ -53,36 +53,40 @@ print(msg)
 while True:
     # Prompt user for the logs directory path
     logs_dir = input("Enter path that contains the logs for zipping or 'exit' to close the program:\n>>> ").strip()
-    files = [file for file in Path(logs_dir).iterdir() if file.is_file() and file.suffix == ".log"]
     
     # Check if user wants to exit
     if logs_dir.lower() == "exit":
-        print("Closing program.")
+        print("Closing program, bye!")
         exit()
-    
-    if len(files) == 0:
-        print(f"Entered path {logs_dir} has no log files, please select a different path.")
-        continue
 
     # Validate the logs directory path
     if Path(logs_dir).is_dir():
-        print(f"Entered path for log files: {logs_dir} (Found {len(files)} log files.)")
+        files = [file for file in Path(logs_dir).iterdir() if file.is_file() and file.suffix == ".log"]
+        print(f"Entered path for log files: {logs_dir} (Found {len(files)} log files)")
+        logger.info(f"Entered path for log files: {logs_dir} (Found {len(files)} log files)")
+        
+        if len(files) == 0:
+            print(f"Entered path {logs_dir} has no log files, please select a different path.")
+            logger.info(f"Entered path {logs_dir} has no log files, please select a different path.")
+            continue
+    
     else:
-        print("Not a valid path. Please try again.")
+        print("Not a valid path! Please try again.")
         continue  # Retry asking for logs directory
 
     # Prompt user for the output directory path
-    output_dir = input("Enter path where to save zipped archives (Enter 'same' to use the previously entered path or 'exit' to exit):\n>>> ").strip()
+    output_dir = input("Enter path where to save zipped archives (Enter 'same' to use the previously entered path or 'exit' to close the program):\n>>> ").strip()
 
     # Check if user wants to exit
     if output_dir.lower() == "exit":
-        print("Closing program.")
+        print("Closing program, bye!")
         exit()
 
     # Check if output path is 'same' or a new path
     if output_dir.lower() == "same":
         output_dir = logs_dir
         print(f"Entered path for zipped archives: {output_dir}")
+        logger.info(f"Entered path for zipped archives: {output_dir}")
         
     elif not Path(output_dir).exists():
         create_folder = input("Path doesn't exist, do you want to create it? (y/n):\n>>> ")
@@ -90,6 +94,7 @@ while True:
             try:
                 Path(output_dir).mkdir(parents=True, exist_ok=False)
                 print(f"Created folder {output_dir} for zipped archives.")
+                logger.info(f"Created folder {output_dir} for zipped archives.")
             except Exception as e:
                 print(f"Error creating directory: {e}")
                 continue  # Retry if creation fails
@@ -99,6 +104,7 @@ while True:
     
     elif Path(output_dir).is_dir():
         print(f"Entered path for zipped archives: {output_dir}")
+        logger.info(f"Entered path for zipped archives: {output_dir}")
     else:
         print("Not a valid path. Please try again.")
         continue  # Retry asking for a valid path
@@ -109,15 +115,17 @@ while True:
 
         # Check if user wants to exit
         if deleted_zipped_logs.lower() == "exit":
-            print("Closing program.")
+            print("Closing program, bye!")
             exit()
             
         if deleted_zipped_logs.lower() == "y":
             print("Log files will be deleted after zipping completes.")
+            logger.info("Log files will be deleted after zipping completes.")
             log_files_delete_flag = True
             break
         elif deleted_zipped_logs.lower() == "n":
             print("Log files will not be deleted after zipping completes.")
+            logger.info("Log files will not be deleted after zipping completes.")
             log_files_delete_flag = False
             break
         else:
@@ -172,7 +180,7 @@ else:
 
    # Zip the files grouped by (year, month)
     for (year, month), group_files in files_grouped_by_month.items():
-        zip_filename = f"{year}-{month}.7z"
+        zip_filename = f"{year}-{month}.zip"
         zip_path = Path(output_dir) / zip_filename
 
       # Create the Zip file and add the grouped files to it
@@ -190,4 +198,4 @@ else:
         if log_files_delete_flag:
             print(f"Cleaning up - Deleted {len(group_files)} log files successfully.")
             logger.info(f"Cleaning up - Deleted {len(group_files)} log files successfully.")
-         
+            
