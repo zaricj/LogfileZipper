@@ -112,10 +112,10 @@ class RegexGeneratorDialog(QDialog):
         layout = QVBoxLayout()
 
         # Input for log file patterns
-        self.patter_input_generator = QLineEdit()
-        self.patter_input_generator.setPlaceholderText("Enter log file patterns (comma-separated)")
+        self.pattern_input_generator = QLineEdit()
+        self.pattern_input_generator.setPlaceholderText("Enter log file patterns (comma-separated)")
         layout.addWidget(QLabel("Log File Patterns (separate multiple entries using commas):"))
-        layout.addWidget(self.patter_input_generator)
+        layout.addWidget(self.pattern_input_generator)
 
         # Generate Regex button
         self.generate_button = QPushButton("Generate Regex")
@@ -148,7 +148,7 @@ class RegexGeneratorDialog(QDialog):
         self.setLayout(layout)
 
     def generate_regex(self):
-        patterns = [p.strip() for p in self.patter_input_generator.text().split(',') if p.strip()]
+        patterns = [p.strip() for p in self.pattern_input_generator.text().split(',') if p.strip()]
         if not patterns:
             self.regex_display.setText("")
             return
@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
         
         # Input for log file patterns
         self.pattern_input = DraggableLineEdit()
-        self.pattern_input.setPlaceholderText("Enter log file patterns (comma-separated)")
+        self.pattern_input.setPlaceholderText("Enter log file patterns (wildcard * is accepted) E.g. 2024_08*, info_message*")
         self.pattern_input.setClearButtonEnabled(True)
         layout.addWidget(QLabel("Log File Patterns (comma-separated):"))
         layout.addWidget(self.pattern_input)
@@ -241,6 +241,7 @@ class MainWindow(QMainWindow):
         self.compression_method_combobox = QComboBox()
         compression_method_combobox_label = QLabel("Compression method:")
         self.compression_method_combobox.addItems(["zlib (Fast)", "bz2 (Good)", "lzma (Highest)"])
+        self.compression_method_combobox.setCurrentText("bz2 (Good)")
         
         self.delete_logfiles_checkbox = QCheckBox("Delete log files after zipping?")
 
@@ -345,11 +346,11 @@ class MainWindow(QMainWindow):
 
         # Open Menu
         open_menu = menu_bar.addMenu("&Open")
-        open_input_action = QAction("Open log files folder", self)
+        open_input_action = QAction("Open Input Folder", self)
         open_input_action.setStatusTip("Opens the log files input folder")
         open_input_action.triggered.connect(self.open_input_folder)
         open_menu.addAction(open_input_action)
-        open_output_action = QAction("Open zipped archives folder ", self)
+        open_output_action = QAction("Open Output Folder", self)
         open_output_action.setStatusTip("Opens the zipped archives output folder")
         open_output_action.triggered.connect(self.open_output_folder)
         open_menu.addAction(open_output_action)
@@ -367,37 +368,37 @@ class MainWindow(QMainWindow):
         if combobox_text == "zlib (Fast)":
             desc_txt = """
         Pros:
-            Fast compression and decompression.
-            Provides a good balance between compression speed and compression ratio.
+            1. Fast compression and decompression.
+            2. Provides a good balance between compression speed and compression ratio.
         Cons:
-            The compression ratio is generally lower than bz2 and lzma.
+            1. The compression ratio is generally lower than bz2 and lzma.
             
-        Best for: General use cases where compatibility, speed, and reasonable compression are needed (e.g., web transfers, archives)."""
+Best for: General use cases where compatibility, speed, and reasonable compression are needed (e.g., web transfers, archives)."""
         
             self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
         
         elif combobox_text == "bz2 (Good)":
             desc_txt = """
         Pros:
-            Higher compression ratio than zlib for most files.
-            Good decompression speed.
+            1. Higher compression ratio than zlib for most files.
+            2. Good decompression speed.
         Cons:
-            Slower compression speed compared to zlib.
+            1. Slower compression speed compared to zlib.
             
-        Best for: Situations where higher compression is desired and compression speed is less of a concern (e.g., backups, log files)."""
+Best for: Situations where higher compression is desired and compression speed is less of a concern (e.g., backups, log files)."""
 
             self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
         
         elif  combobox_text == "lzma (Highest)":
             desc_txt = """
         Pros:
-            Achieves the highest compression ratio among the three methods.
-            Good choice for very large files or when maximum compression is necessary.
+            1. Achieves the highest compression ratio among the three methods.
+            2. Good choice for very large files or when maximum compression is necessary.
         Cons:
-            Slower compression and decompression speed.
-            Consumes more memory during compression.
+            1. Slower compression and decompression speed.
+            2. Consumes more memory during compression.
             
-        Best for: Cases where maximum compression is essential, and speed or memory usage is not critical (e.g., distributing software packages, compressing large datasets)."""
+Best for: Cases where maximum compression is essential, and speed or memory usage is not critical (e.g., distributing software packages, compressing large datasets)."""
             
             self.program_output.setText(f"Selected compression method: {combobox_text} - Description:\n{desc_txt}")
             
@@ -412,7 +413,7 @@ class MainWindow(QMainWindow):
                 message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
                 QMessageBox.critical(self, "Error", message)
         else:
-            QMessageBox.warning(self, "Error", f"Path does not exist or is not a valid path:\n{directory_path}")
+            QMessageBox.warning(self, "Path Error", f"Path does not exist or is not a valid path:\n{directory_path}")
     
     
     # Open Zipped Archive output folder
@@ -426,7 +427,7 @@ class MainWindow(QMainWindow):
                 message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
                 QMessageBox.critical(self, "Error", message)
         else:
-            QMessageBox.warning(self, "Error", f"Path does not exist or is not a valid path:\n{directory_path}")
+            QMessageBox.warning(self, "Path Error", f"Path does not exist or is not a valid path:\n{directory_path}")
 
         
     def browse_input_folder(self):
@@ -470,11 +471,11 @@ class MainWindow(QMainWindow):
             return
         
         if not os.path.exists(input_folder):
-            QMessageBox.critical(self, "Error", f"Input folder does not exist: {input_folder}")
+            QMessageBox.warning(self, "Input folder is empty", f"Input folder does not exist: {input_folder}")
             return
         
         if not os.path.exists(output_folder):
-            reply = QMessageBox.warning(self,"Warning", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.warning(self,"Output folder not found", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             # Check the user's response
             if reply == QMessageBox.Yes:
@@ -513,7 +514,7 @@ class MainWindow(QMainWindow):
         self.delete_logfiles_checkbox.setDisabled(True)
 
     def on_worker_finished(self):
-        QMessageBox.information(self, "Success", "Zipping process completed.")
+        QMessageBox.information(self, "Zipping task completed", "Zipping process completed successfully.")
         self.output_folder_button.setDisabled(False)
         self.output_folder.setDisabled(False)
         self.input_folder_button.setDisabled(False)
@@ -536,7 +537,7 @@ class MainWindow(QMainWindow):
             background-color: #2b2b2b;
             color: #ffffff;
             font-family: 'Segoe UI', sans-serif;
-            font-size: 14px;
+            font-size: 12px;
         }
         QLabel {
             color: #ffffff;
@@ -552,6 +553,10 @@ class MainWindow(QMainWindow):
         QLineEdit:focus, QTextEdit:focus, QTreeView:focus {
             border-color: #0d47a1;
             background-color: #3a3a3a;
+        }
+        QComboBox {
+            font-size: 15px;
+            font: bold;
         }
         QPushButton {
             background-color: #0d47a1;
