@@ -9,6 +9,7 @@ import re
 import zipfile
 import os
 import sys
+import time
 
 class Worker(QObject):
     progress_updated = Signal(int)
@@ -32,6 +33,7 @@ class Worker(QObject):
 
     def run(self):
         try:
+            start = time.process_time()
             counter = 0 # Counter to display compressing archive 1 out of n
             self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
             for pattern in self.patterns:
@@ -58,16 +60,19 @@ class Worker(QObject):
                             self.log_message.emit(f"Zipping file {file}")
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
-                                
+                    
+                    elapsed = time.process_time() - start
+                    
                     if self.delete_logfiles_checkbox:
-                        task_complete_message = f"Task completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped."
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped.\nElapsed time: {elapsed} seconds."
                         self.log_message.emit(task_complete_message)
                     else:
-                        task_complete_message = f"Task completed - Created archive '{zip_filename}' with {len(matching_files)} files."
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nElapsed time: {elapsed} seconds."
                         self.log_message.emit(task_complete_message)
                     
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
+                    self.finished.emit() #TODO Move QMessageBox Info here instead of finished attribute
             
             self.finished.emit()
         except Exception as e:
