@@ -1,28 +1,34 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar, QCheckBox,
-                             QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel)
+                             QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel, QSpinBox)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QDropEvent
-from PySide6.QtCore import QThread, Signal, QObject, QDir
+from PySide6.QtCore import QThread, Signal, QObject, QDir, QFile, QTextStream
 from pathlib import Path
 import re
 import zipfile
 import os
 import sys
 import time
+from datetime import datetime, timedelta
+
+# Directory where the script is located
+basedir = os.path.dirname(__file__)
 
 class Worker(QObject):
     progress_updated = Signal(int)
     log_message = Signal(str)
     finished = Signal()
 
-    def __init__(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping):
+    def __init__(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than):
         super().__init__()
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.patterns = patterns
         self.compression_method_text = compression_method  
         self.delete_logfiles_checkbox = delete_logfiles_after_zipping
+        self.ignore_younger_than = ignore_younger_than
+        self.ignore_older_than = ignore_older_than
         
         if compression_method  == "zlib (Fast)":
             self.compression_method = zipfile.ZIP_DEFLATED
@@ -40,8 +46,21 @@ class Worker(QObject):
                 counter += 1 # Updating the counter
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
                 matching_files = [f for f in os.listdir(self.input_folder) if re.match(regex, f)]
+                now = datetime.now()
+                filtered_files = []
+                
+                for file in matching_files:
+                    file_path = os.path.join(self.input_folder, file)
+                    creation_time = datetime.fromtimestamp(os.path.getctime(file_path))
+                    file_age = (now - creation_time).days
+                    
+                    if (self.ignore_younger_than is None or file_age >= self.ignore_younger_than) and \
+                       (self.ignore_older_than is None or file_age <= self.ignore_older_than):
+                        filtered_files.append(file)
+                        
                 total_files = len(matching_files)
-                if matching_files:
+                
+                if filtered_files:
                     # Print processing message
                     creating_archive_message = f"Creating archive {pattern.replace('*', '')}.zip ({counter}/{len(self.patterns)})"
                     self.log_message.emit(len(creating_archive_message) * "-")
@@ -105,100 +124,38 @@ class DraggableLineEdit(QLineEdit):
         else:
             event.ignore()
 
-class RegexGeneratorDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Regex Generator and Tester")
-        self.setWindowIcon(QIcon("_internal\\icon\\zipzap.ico"))
-        self.setGeometry(100, 100, 600, 400)
-        self.initUI()
-
-    def initUI(self):
-        layout = QVBoxLayout()
-
-        # Input for log file patterns
-        self.pattern_input_generator = QLineEdit()
-        self.pattern_input_generator.setPlaceholderText("Enter log file patterns (comma-separated)")
-        layout.addWidget(QLabel("Log File Patterns (separate multiple entries using commas):"))
-        layout.addWidget(self.pattern_input_generator)
-
-        # Generate Regex button
-        self.generate_button = QPushButton("Generate Regex")
-        self.generate_button.clicked.connect(self.generate_regex)
-        layout.addWidget(self.generate_button)
-
-        # Display generated regex
-        self.regex_display = QLineEdit()
-        self.regex_display.setReadOnly(True)
-        layout.addWidget(QLabel("Generated Regex:"))
-        layout.addWidget(self.regex_display)
-
-        # Test input
-        self.test_input = QLineEdit()
-        self.test_input.setPlaceholderText("Enter a test string")
-        layout.addWidget(QLabel("Test String:"))
-        layout.addWidget(self.test_input)
-
-        # Test button
-        self.test_button = QPushButton("Test Regex")
-        self.test_button.clicked.connect(self.test_regex)
-        layout.addWidget(self.test_button)
-
-        # Results display
-        self.results_display = QTextEdit()
-        self.results_display.setReadOnly(True)
-        layout.addWidget(QLabel("Test Results:"))
-        layout.addWidget(self.results_display)
-
-        self.setLayout(layout)
-
-    def generate_regex(self):
-        patterns = [p.strip() for p in self.pattern_input_generator.text().split(',') if p.strip()]
-        if not patterns:
-            self.regex_display.setText("")
-            return
-
-        regex_parts = []
-        for pattern in patterns:
-            escaped_pattern = re.escape(pattern).replace(r'\*', '.*')
-            regex_parts.append(f"({escaped_pattern})")
-
-        full_regex = '^' + '|'.join(regex_parts) + '$'
-        self.regex_display.setText(full_regex)
-
-    def test_regex(self):
-        regex = self.regex_display.text()
-        test_string = self.test_input.text()
-
-        if not regex or not test_string:
-            self.results_display.setText("Please generate a regex and enter a test string.")
-            return
-
-        try:
-            match = re.match(regex, test_string)
-            if match:
-                self.results_display.setText(f"Match found: {match.group()}")
-            else:
-                self.results_display.setText("No match found.")
-        except re.error as e:
-            self.results_display.setText(f"Regex error: {str(e)}")
-
 class MainWindow(QMainWindow):
     progress_updated = Signal(int)
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Logfile Zipper v1.0.2")
+        self.setWindowTitle("Logfile Zipper v1.1.0")
         self.setWindowIcon(QIcon("_internal\\icon\\zipzap.ico"))
-        self.setGeometry(500, 250, 1000, 700)
+        self.setGeometry(500, 250, 800, 700)
         self.saveGeometry()
+        
+        # Current theme files to set as the main UI theme
+        self.theme = os.path.join(basedir, "_internal\\themes\\default.qss")
+        
+        # Initialize the .qss Theme File on startup
+        self.initialize_theme(self.theme)
+        
+        # Initialize the UI and it's layouts
         self.initUI()
         
         # Create the menu bar
         self.create_menu_bar()
-        
-        # Apply the custom dark theme
-        self.apply_custom_dark_theme()
+    
+    def initialize_theme(self, theme_file):
+        try:
+            file = QFile(theme_file)
+            if file.open(QFile.ReadOnly | QFile.Text):
+                stream = QTextStream(file)
+                stylesheet = stream.readAll()
+                self.setStyleSheet(stylesheet)
+            file.close()
+        except Exception as ex:
+            QMessageBox.critical(self, "Theme load error", f"Failed to load theme: {str(ex)}")
         
     def initUI(self):
         
@@ -240,6 +197,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Log File Patterns (comma-separated):"))
         layout.addWidget(self.pattern_input)
         
+        # Buttons Layout
         buttons_layout = QHBoxLayout()
         
         # Compression CombBox
@@ -259,27 +217,46 @@ class MainWindow(QMainWindow):
         self.zip_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.zip_button.clicked.connect(self.zip_log_files)
         buttons_layout.addWidget(self.zip_button)
-
-        # Open Regex Generator button
-        self.regex_button = QPushButton("Open Regex Generator")
-        self.regex_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.regex_button.clicked.connect(self.open_regex_generator)
-        buttons_layout.addWidget(self.regex_button)
         
         layout.addLayout(buttons_layout)
 
+        # Date Filter Layout
+        date_filter_layout = QHBoxLayout()
+        self.ignore_younger_than_label = QLabel("Ignore files younger than:")
+        self.ignore_younger_than_label.setMargin(10)
+        self.ignore_younger_than_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.ignore_younger_than = QSpinBox()
+        self.ignore_younger_than.set
+        self.ignore_younger_than.setRange(0, 9999)
+        self.ignore_younger_than.setSpecialValueText("Off")
+        self.ignore_younger_than.setSuffix(" days")
+        date_filter_layout.addWidget(self.ignore_younger_than_label)
+        date_filter_layout.addWidget(self.ignore_younger_than)
+        
+        self.ignore_older_than = QSpinBox()
+        self.ignore_older_than_label = QLabel("Ignore files older than:")
+        self.ignore_older_than_label.setMargin(10)
+        self.ignore_older_than_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.ignore_older_than.setRange(0, 9999)
+        self.ignore_older_than.setSpecialValueText("Off")
+        self.ignore_older_than.setSuffix(" days")
+        date_filter_layout.addWidget(self.ignore_older_than_label)
+        date_filter_layout.addWidget(self.ignore_older_than)
+        layout.addLayout(date_filter_layout)
+        
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
         layout.addWidget(self.progress_bar)
-
-        # Statusbar
+        
+        # Statusbar Layout
+        statusbar_layout = QHBoxLayout()
+        
         self.logfiles_count_statusbar = QStatusBar()
         self.setStatusBar(self.logfiles_count_statusbar)
         self.logfiles_count_statusbar.setSizeGripEnabled(False)
         self.logfiles_count_statusbar.setStyleSheet("font-size: 16px; font-weight: bold; color: #0c6cd4")
-        statusbar_layout = QHBoxLayout()
         statusbar_layout.addWidget(self.logfiles_count_statusbar)
         layout.addLayout(statusbar_layout)
         
@@ -458,11 +435,6 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
             self.logfiles_count_statusbar.setStyleSheet("color: #0d47a1")
             self.logfiles_count_statusbar.showMessage(f"Error counting Log files: {message}")
             
-            
-    def open_regex_generator(self):
-        dialog = RegexGeneratorDialog(self)
-        dialog.exec()
-        
         
     def zip_log_files(self):
         input_folder = self.input_folder.text()
@@ -470,6 +442,8 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         compression_method = self.compression_method_combobox.currentText()
         delete_logfiles_after_zipping = self.delete_logfiles_checkbox.isChecked()
         patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
+        ignore_younger_than = self.ignore_younger_than.value() if self.ignore_younger_than.value() > 0 else None
+        ignore_older_than = self.ignore_older_than.value() if self.ignore_older_than.value() > 0 else None
         
         if not input_folder or not output_folder or not patterns:
             QMessageBox.warning(self, "Error", "Please fill in all fields.")
@@ -480,7 +454,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
             return
         
         if not os.path.exists(output_folder):
-            reply = QMessageBox.warning(self,"Output folder not found", f"Output folder does not exist: {output_folder}\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            reply = QMessageBox.question(self,"Output folder not found", f"The following output folder does not exist:\n{output_folder}\n\nDo you want to create it?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             # Check the user's response
             if reply == QMessageBox.Yes:
@@ -496,7 +470,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping)
+        self.worker = Worker(input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
@@ -508,115 +482,26 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         # Start the thread
         self.thread.start()
         
-        # Disabled button on run
-        self.output_folder_button.setDisabled(True)
-        self.output_folder.setDisabled(True)
-        self.input_folder_button.setDisabled(True)
-        self.input_folder.setDisabled(True)
-        self.zip_button.setDisabled(True)
-        self.regex_button.setDisabled(True)
-        self.compression_method_combobox.setDisabled(True)
-        self.delete_logfiles_checkbox.setDisabled(True)
+        # Disable UI elements during procesing
+        self.set_ui_enabled(False)
+        
+    def set_ui_enabled(self, enabled):
+        self.output_folder_button.setEnabled(enabled)
+        self.output_folder.setEnabled(enabled)
+        self.input_folder_button.setEnabled(enabled)
+        self.input_folder.setEnabled(enabled)
+        self.zip_button.setEnabled(enabled)
+        self.compression_method_combobox.setEnabled(enabled)
+        self.delete_logfiles_checkbox.setEnabled(enabled)
+        self.ignore_younger_than.setEnabled(enabled)
+        self.ignore_older_than.setEnabled(enabled)
 
     def on_worker_finished(self):
         QMessageBox.information(self, "Zipping task completed", "Zipping process completed successfully.")
-        self.output_folder_button.setDisabled(False)
-        self.output_folder.setDisabled(False)
-        self.input_folder_button.setDisabled(False)
-        self.input_folder.setDisabled(False)
-        self.zip_button.setDisabled(False)
-        self.regex_button.setDisabled(False)
-        self.compression_method_combobox.setDisabled(False)
-        self.delete_logfiles_checkbox.setDisabled(False)
+        self.set_ui_enabled(True)
         self.progress_bar.reset()
         self.thread.quit()
         self.thread.wait()
-            
-    def apply_custom_dark_theme(self):
-        self.setStyleSheet("""
-        QMainWindow {
-            background-color: #2b2b2b;
-            color: #ffffff;
-        }
-        QWidget {
-            background-color: #2b2b2b;
-            color: #ffffff;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 12px;
-        }
-        QLabel {
-            color: #ffffff;
-            font: bold;
-        }
-        QLineEdit, QTextEdit, QTreeView {
-            background-color: #3a3a3a;
-            border: 1px solid #555555;
-            border-radius: 4px;
-            padding: 6px;
-            color: #ffffff;
-        }
-        QLineEdit:focus, QTextEdit:focus, QTreeView:focus {
-            border-color: #0d47a1;
-            background-color: #3a3a3a;
-        }
-        QComboBox {
-            font-size: 15px;
-            font: bold;
-        }
-        QPushButton {
-            background-color: #0d47a1;
-            color: white;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-weight: 500;
-            min-width: 90px;
-        }
-        QPushButton:hover {
-            background-color: #1565c0;
-        }
-        QPushButton:pressed {
-            background-color: #0a3d91;
-        }
-        QPushButton:disabled {
-            background-color: #808080;
-        }
-        QTreeView::item:selected {
-            background-color: #1565c0;
-        }
-        QMenuBar {
-            border-bottom: 2px solid #0d47a1;
-            background-color: #2b2b2b;
-            color: #ffffff;
-        }
-        QMenuBar::item:selected {
-            background-color: #3a3a3a;
-        }
-        QMenu {
-            background-color: #2b2b2b;
-            color: #ffffff;
-            border: 1px solid #424242;
-            border-radius: 6px;
-        }
-        QMenu::item:selected {
-            background-color: #1565c0;
-        }
-        QStatusBar {
-            background-color: #1e1e1e;
-            color: #ffffff;
-        }
-        QProgressBar {
-            border: 2px solid grey;
-            border-radius: 6px;
-            text-align: center;
-            font-weight: 600;
-            font: bold 
-        }
-        QProgressBar::chunk {
-            background-color: #0d47a1;
-            width: 10px;
-            margin: 0.5px
-        }
-        """)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
