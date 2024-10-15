@@ -1,16 +1,16 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar, QCheckBox,
-                             QFileDialog, QMessageBox, QSizePolicy, QDialog, QTreeView, QFileSystemModel, QSpinBox)
+                             QFileDialog, QMessageBox, QSizePolicy, QTreeView, QFileSystemModel, QSpinBox)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QDropEvent
-from PySide6.QtCore import QThread, Signal, QObject, QDir, QFile, QTextStream
+from PySide6.QtCore import QThread, Signal, QObject, QDir, QFile, QTextStream, QSettings
 from pathlib import Path
 import re
 import zipfile
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Directory where the script is located
 basedir = os.path.dirname(__file__)
@@ -45,7 +45,8 @@ class Worker(QObject):
             for pattern in self.patterns:
                 counter += 1 # Updating the counter
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
-                matching_files = [f for f in os.listdir(self.input_folder) if re.match(regex, f)]
+                # Only .log files - Change in the future maybe to any filetype = remove f.endswith(".log"), pattern must then end like this "*.<some_filetype> e.x. (*.xlsx, *.txt, *.mp3 etc...)"
+                matching_files = [f for f in os.listdir(self.input_folder) if f.endswith(".log") and re.match(regex, f)] 
                 now = datetime.now()
                 filtered_files = []
                 
@@ -83,20 +84,23 @@ class Worker(QObject):
                     elapsed = time.process_time() - start
                     
                     if self.delete_logfiles_checkbox:
-                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped.\nElapsed time: {elapsed} seconds."
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {len(matching_files)} log files that were zipped.\nElapsed time: {round(elapsed, 2)} seconds."
                         self.log_message.emit(task_complete_message)
                     else:
-                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nElapsed time: {elapsed} seconds."
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nElapsed time: {round(elapsed, 2)} seconds."
                         self.log_message.emit(task_complete_message)
-                    
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
-                    self.finished.emit() #TODO Move QMessageBox Info here instead of finished attribute
+                    QMessageBox.information(self, "No files found", f"No files found matching pattern(s): {pattern}.")
             
             self.finished.emit()
-        except Exception as e:
-            self.log_message.emit(f"An error occurred: {str(e)}")
+            QMessageBox.information(self, "Zipping Completed", "Zipping process completed successfully.")
+            
+        except Exception as ex:
+            message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+            self.log_message.emit(message)
             self.finished.emit()
+            QMessageBox.critical(self, "An exception occurred", message)
 
 class DraggableLineEdit(QLineEdit):
     def __init__(self, parent=None):
@@ -134,8 +138,13 @@ class MainWindow(QMainWindow):
         self.setGeometry(500, 250, 800, 700)
         self.saveGeometry()
         
+        # Settingsto save current location of the windows on exit
+        self.settings = QSettings("App","LogfileZipper")
+        geometry = self.settings.value("geometry", bytes())
+        self.restoreGeometry(geometry)
+        
         # Current theme files to set as the main UI theme
-        self.theme = os.path.join(basedir, "_internal\\themes\\default.qss")
+        self.theme = "_internal\\themes\\default.qss"
         
         # Initialize the .qss Theme File on startup
         self.initialize_theme(self.theme)
@@ -155,7 +164,8 @@ class MainWindow(QMainWindow):
                 self.setStyleSheet(stylesheet)
             file.close()
         except Exception as ex:
-            QMessageBox.critical(self, "Theme load error", f"Failed to load theme: {str(ex)}")
+            message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+            QMessageBox.critical(self, "Theme load error", f"Failed to load theme:\n{message}")
         
     def initUI(self):
         
@@ -226,7 +236,6 @@ class MainWindow(QMainWindow):
         self.ignore_younger_than_label.setMargin(10)
         self.ignore_younger_than_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.ignore_younger_than = QSpinBox()
-        self.ignore_younger_than.set
         self.ignore_younger_than.setRange(0, 9999)
         self.ignore_younger_than.setSpecialValueText("Off")
         self.ignore_younger_than.setSuffix(" days")
@@ -305,6 +314,9 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event: QCloseEvent):
         reply = QMessageBox.question(self, "Exit Program", "Are you sure you want to exit the program?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        geometry = self.saveGeometry()
+        self.settings.setValue("geometry", geometry)
         
         if reply == QMessageBox.Yes:
             event.accept()
@@ -393,7 +405,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
                 os.startfile(directory_path)
             except Exception as ex:
                 message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
-                QMessageBox.critical(self, "Error", message)
+                QMessageBox.critical(self, "An exception occurred", message)
         else:
             QMessageBox.warning(self, "Path Error", f"Path does not exist or is not a valid path:\n{directory_path}")
     
@@ -407,7 +419,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
                 os.startfile(directory_path)
             except Exception as ex:
                 message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
-                QMessageBox.critical(self, "Error", message)
+                QMessageBox.critical(self, "An exception occurred", message)
         else:
             QMessageBox.warning(self, "Path Error", f"Path does not exist or is not a valid path:\n{directory_path}")
 
@@ -461,8 +473,9 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
                 try:
                     os.makedirs(output_folder)
                     QMessageBox.information(self, "Success", f"Folder created: {output_folder}")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to create folder: {e}")
+                except Exception as ex:
+                    message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+                    QMessageBox.critical(self, "An exception occurred", f"Failed to create folder: {message}")
             else:
                 return
         
@@ -497,7 +510,6 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         self.ignore_older_than.setEnabled(enabled)
 
     def on_worker_finished(self):
-        QMessageBox.information(self, "Zipping task completed", "Zipping process completed successfully.")
         self.set_ui_enabled(True)
         self.progress_bar.reset()
         self.thread.quit()
