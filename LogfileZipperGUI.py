@@ -19,9 +19,11 @@ class Worker(QObject):
     progress_updated = Signal(int)
     log_message = Signal(str)
     finished = Signal()
+    show_message = Signal(str, str)
 
-    def __init__(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than):
+    def __init__(self, parent, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than):
         super().__init__()
+        self.parent = parent
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.patterns = patterns
@@ -41,7 +43,6 @@ class Worker(QObject):
         try:
             start = time.process_time()
             counter = 0 # Counter to display compressing archive 1 out of n
-            self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
             for pattern in self.patterns:
                 counter += 1 # Updating the counter
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
@@ -63,6 +64,7 @@ class Worker(QObject):
                 
                 if filtered_files:
                     # Print processing message
+                    self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
                     creating_archive_message = f"Creating archive {pattern.replace('*', '')}.zip ({counter}/{len(self.patterns)})"
                     self.log_message.emit(len(creating_archive_message) * "-")
                     self.log_message.emit(creating_archive_message)
@@ -89,18 +91,19 @@ class Worker(QObject):
                     else:
                         task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nElapsed time: {round(elapsed, 2)} seconds."
                         self.log_message.emit(task_complete_message)
+
+                    self.finished.emit()
+                    self.show_message.emit("Zipping Completed", "Zipping process completed successfully.")  
+                    
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
-                    QMessageBox.information(self, "No files found", f"No files found matching pattern(s): {pattern}.")
-            
-            self.finished.emit()
-            QMessageBox.information(self, "Zipping Completed", "Zipping process completed successfully.")
-            
+                    self.finished.emit()
+                    
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
             self.log_message.emit(message)
+            self.show_message.emit("An exception occurred", message)  
             self.finished.emit()
-            QMessageBox.critical(self, "An exception occurred", message)
 
 class DraggableLineEdit(QLineEdit):
     def __init__(self, parent=None):
@@ -138,7 +141,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(500, 250, 800, 700)
         self.saveGeometry()
         
-        # Settingsto save current location of the windows on exit
+        # Settings to save current location of the windows on exit
         self.settings = QSettings("App","LogfileZipper")
         geometry = self.settings.value("geometry", bytes())
         self.restoreGeometry(geometry)
@@ -483,13 +486,14 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than)
+        self.worker = Worker(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
         self.worker.progress_updated.connect(self.progress_bar.setValue)
         self.worker.log_message.connect(self.program_output.append)
         self.worker.finished.connect(self.on_worker_finished)
+        self.worker.show_message.connect(self.show_message_box)  
         self.thread.started.connect(self.worker.run)
         
         # Start the thread
@@ -514,6 +518,9 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         self.progress_bar.reset()
         self.thread.quit()
         self.thread.wait()
+    
+    def show_message_box(self, title, message):
+        QMessageBox.information(self, title, message)  
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
