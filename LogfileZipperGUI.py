@@ -335,6 +335,9 @@ class MainWindow(QMainWindow):
         clear_action.setStatusTip("Clear the output")
         clear_action.triggered.connect(self.clear_output)
         file_menu.addAction(clear_action)
+        clear_radiobox_action = QAction("Reset Spinboxes", self)
+        clear_radiobox_action.triggered.connect(self.reset_spinboxes)
+        file_menu.addAction(clear_radiobox_action)
         file_menu.addSeparator()
         exit_action = QAction("E&xit", self)
         exit_action.setStatusTip("Exit the application")
@@ -359,6 +362,11 @@ class MainWindow(QMainWindow):
     
     def clear_output(self):
         self.program_output.clear()
+    
+    # Reset both spinboxes to the "Off" special value
+    def reset_spinboxes(self):
+        self.ignore_younger_than.setValue(0)
+        self.ignore_older_than.setValue(0)
         
     def get_compression_method(self):
         combobox_text = self.compression_method_combobox.currentText()
