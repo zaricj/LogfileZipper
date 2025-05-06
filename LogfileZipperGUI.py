@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QComboBox, QTextEdit, QProgressBar, QStatusBar, QCheckBox,
-                             QFileDialog, QMessageBox, QSizePolicy, QTreeView, QFileSystemModel, QSpinBox)
+                             QFileDialog, QMessageBox, QSizePolicy, QTreeView, QFileSystemModel, QDateTimeEdit)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QDropEvent
-from PySide6.QtCore import QThread, Signal, QObject, QDir, QFile, QTextStream, QSettings
+from PySide6.QtCore import QThread, Signal, QObject, QDir, QFile, QTextStream, QSettings, QDate
 from pathlib import Path
 import re
 import zipfile
@@ -11,6 +11,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from collections import defaultdict
 
 # Directory where the script is located
 basedir = os.path.dirname(__file__)
@@ -21,16 +22,16 @@ class Worker(QObject):
     finished = Signal()
     show_message = Signal(str, str)
 
-    def __init__(self, parent, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than):
+    def __init__(self, parent, input_folder:str, output_folder:str, patterns:list, compression_method:str, delete_logfiles_after_zipping:bool, date_filter_state:bool, zip_files_older_than_date:datetime):
         super().__init__()
         self.parent = parent
-        self.input_folder = input_folder
-        self.output_folder = output_folder
-        self.patterns = patterns
-        self.compression_method_text = compression_method  
-        self.delete_logfiles_checkbox = delete_logfiles_after_zipping
-        self.ignore_younger_than = ignore_younger_than
-        self.ignore_older_than = ignore_older_than
+        self.input_folder: str = input_folder
+        self.output_folder: str = output_folder
+        self.pattern: list = patterns
+        self.compression_method_text: str = compression_method  
+        self.delete_logfiles_checkbox: bool = delete_logfiles_after_zipping
+        self.date_filter_state: bool = date_filter_state
+        self.zip_files_older_than_date: str = zip_files_older_than_date
         
         if compression_method  == "zlib (Fast)":
             self.compression_method = zipfile.ZIP_DEFLATED
@@ -38,48 +39,37 @@ class Worker(QObject):
             self.compression_method = zipfile.ZIP_BZIP2
         elif compression_method  == "lzma (Highest)":
             self.compression_method = zipfile.ZIP_LZMA
-
-    def run(self):
+    
+    def zip_files_no_date_filter(self, input_folder:str, output_folder:str, patterns:list) -> None:
         try:
             start = time.process_time()
             counter = 0 # Counter to display compressing archive 1 out of n
-            for pattern in self.patterns:
+            for pattern in patterns:
                 counter += 1 # Updating the counter
                 regex = f"^{re.escape(pattern).replace('\\*', '.*')}$"
-                # Only .log files - Change in the future maybe to any filetype = remove f.endswith(".log"), pattern must then end like this "*.<some_filetype> e.x. (*.xlsx, *.txt, *.mp3 etc...)"
-                matching_files = [f for f in os.listdir(self.input_folder) if f.endswith(".log") and re.match(regex, f)] 
-                now = datetime.now()
-                filtered_files = []
                 
-                for file in matching_files:
-                    file_path = os.path.join(self.input_folder, file)
-                    creation_time = datetime.fromtimestamp(os.path.getctime(file_path))
-                    file_age = (now - creation_time).days
-                    
-                    if (self.ignore_younger_than is None or file_age >= self.ignore_younger_than) and \
-                       (self.ignore_older_than is None or file_age <= self.ignore_older_than):
-                        filtered_files.append(file)
-                        
+                # Only .log files - Change in the future maybe to any filetype = remove f.endswith(".log"), pattern must then end like this "*.<some_filetype> e.x. (*.xlsx, *.txt, *.mp3 etc...)"
+                matching_files = [f for f in os.listdir(input_folder) if f.endswith(".log") and re.match(regex, f)] 
                 total_files = len(matching_files)
                 
-                if filtered_files:
+                if matching_files:
                     # Print processing message
                     self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
-                    creating_archive_message = f"Creating archive {pattern.replace('*', '')}.zip ({counter}/{len(self.patterns)})"
+                    creating_archive_message = f"Creating archive {pattern.replace('*', '')}.zip ({counter}/{len(patterns)})"
                     self.log_message.emit(len(creating_archive_message) * "-")
                     self.log_message.emit(creating_archive_message)
                     self.log_message.emit(len(creating_archive_message) * "-")
                     # Continue processing
                     zip_filename = f"{pattern.replace('*', '')}.zip"
-                    zip_path = os.path.join(self.output_folder, zip_filename)
+                    zip_path = os.path.join(output_folder, zip_filename)
                     self.log_message.emit("Starting zipping of log files...")
                     with zipfile.ZipFile(zip_path, "w", compression=self.compression_method) as zipf:
                         for index, file in enumerate(matching_files):
-                            file_path = os.path.join(self.input_folder, file)
+                            self.log_message.emit(f"Zipping file {file}")
+                            file_path = os.path.join(input_folder, file)
                             zipf.write(file_path, arcname=file)
                             if self.delete_logfiles_checkbox:
                                 os.unlink(file_path) # Deletes zipped log files
-                            self.log_message.emit(f"Zipping file {file}")
                             progress = int((index + 1) / total_files * 100)
                             self.progress_updated.emit(progress)
                     
@@ -91,14 +81,87 @@ class Worker(QObject):
                     else:
                         task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nElapsed time: {round(elapsed, 2)} seconds."
                         self.log_message.emit(task_complete_message)
-
-                    self.finished.emit()
-                    self.show_message.emit("Zipping Completed", "Zipping process completed successfully.")  
-                    
                 else:
                     self.log_message.emit(f"No files found matching pattern(s): {pattern}")
-                    self.finished.emit()
-                    
+
+        except Exception as ex:
+            message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+            self.log_message.emit(message)
+            self.show_message.emit("An exception occurred", message)  
+
+            
+    def zip_files_with_date_filter(self, input_folder:str, output_folder:str, zip_files_older_than_date:datetime) -> None:
+        try:
+            start = time.process_time()
+            counter = 0 # Counter to display compressing archive 1 out of n
+            files_to_zip: dict[str, list[str]] = defaultdict(list)
+
+            # Only .log files - Change in the future maybe to any filetype = remove f.endswith(".log"), pattern must then end like this "*.<some_filetype> e.x. (*.xlsx, *.txt, *.mp3 etc...)"
+            matching_files = [f for f in os.listdir(input_folder) if f.endswith(".log")] 
+            
+            for file in matching_files:
+                file_path = os.path.join(input_folder, file)
+                creation_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                key = creation_time.strftime("%Y_%m")  # e.g. '2025_03'
+                
+                if creation_time < zip_files_older_than_date: # Add files to dictionary if older than the date
+                    files_to_zip[key].append(file)
+                
+                
+            if files_to_zip:
+                for key, values in files_to_zip.items():
+                    total_files = sum(len(v) for v in files_to_zip.values())
+                    files_processed = 0
+
+                    counter += 1 # Updating the counter
+                    zip_filename = f"{key}.zip"
+                    # Print processing message
+                    self.log_message.emit(f"Starting to compress log files with compression method: {self.compression_method_text}")
+                    creating_archive_message = f"Creating archive {zip_filename} ({counter}/{len(files_to_zip.keys())})"
+                    self.log_message.emit(len(creating_archive_message) * "-")
+                    self.log_message.emit(creating_archive_message)
+                    self.log_message.emit(len(creating_archive_message) * "-")
+                    # Continue processing
+                    zip_path = os.path.join(output_folder, zip_filename)
+                    self.log_message.emit("Starting zipping of log files...")
+                    with zipfile.ZipFile(zip_path, "w", compression=self.compression_method) as zipf:
+                        for file in values:
+                            self.log_message.emit(f"Zipping file {file}")
+                            files_processed += 1
+                            file_path = os.path.join(input_folder, file)
+                            zipf.write(file_path, arcname=file)
+                            if self.delete_logfiles_checkbox:
+                                os.unlink(file_path) # Deletes zipped log files
+                        progress = int((counter / len(files_to_zip.keys())) * 100)
+                        self.progress_updated.emit(progress)
+
+                    elapsed = time.process_time() - start
+
+                    if self.delete_logfiles_checkbox:
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {len(matching_files)} files.\nCleaning up - Deleted {files_processed} log files that were zipped\nElapsed time: {round(elapsed, 2)} seconds."
+                        self.log_message.emit(task_complete_message)
+                    else:
+                        task_complete_message = f"\nTask completed - Created archive '{zip_filename}' with {files_processed} files.\nElapsed time: {round(elapsed, 2)} seconds."
+                        self.log_message.emit(task_complete_message)
+            else:
+                self.log_message.emit("No matching files found.")
+                        
+        except Exception as ex:
+            message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+            self.log_message.emit(message)
+            self.show_message.emit("An exception occurred", message)  
+            
+
+    def run(self):
+        try:
+            if self.date_filter_state:
+                self.zip_files_with_date_filter(self.input_folder, self.output_folder, self.zip_files_older_than_date)
+            else:
+                self.zip_files_no_date_filter(self.input_folder, self.output_folder, self.pattern)
+                
+            # Emit finished signal
+            self.finished.emit()
+            
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
             self.log_message.emit(message)
@@ -137,7 +200,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Logfile Zipper v1.1.0")
-        self.setWindowIcon(QIcon("_internal\\icon\\zipzap.ico"))
+        self.setWindowIcon(QIcon(os.path.join("resources","_internal","icon","zipzap.ico")))
         self.setGeometry(500, 250, 800, 700)
         self.saveGeometry()
         
@@ -147,7 +210,7 @@ class MainWindow(QMainWindow):
         self.restoreGeometry(geometry)
         
         # Current theme files to set as the main UI theme
-        self.theme = "_internal\\themes\\default.qss"
+        self.theme = os.path.join("resources","_internal","themes","default.qss")
         
         # Initialize the .qss Theme File on startup
         self.initialize_theme(self.theme)
@@ -210,6 +273,25 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Log File Patterns (comma-separated):"))
         layout.addWidget(self.pattern_input)
         
+        # Date Filter Layout
+        date_filter_layout = QHBoxLayout()
+        
+        self.enable_date_filter_checkbox = QCheckBox("Enable Date Filter")
+        self.enable_date_filter_checkbox.setChecked(False)
+        self.enable_date_filter_checkbox.stateChanged.connect(self.enable_date_filter_state)
+        self.zip_files_older_than_label = QLabel("Zip files older than the date (yyyy.mm.dd):")
+        self.zip_files_older_than_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.zip_files_older_than = QDateTimeEdit(QDate.currentDate())
+        self.zip_files_older_than.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.zip_files_older_than.setCalendarPopup(True)
+        self.zip_files_older_than.setDisplayFormat("yyyy.MM.dd")
+        self.zip_files_older_than.setDisabled(True)
+        
+        date_filter_layout.addWidget(self.enable_date_filter_checkbox)
+        date_filter_layout.addWidget(self.zip_files_older_than_label)
+        date_filter_layout.addWidget(self.zip_files_older_than)
+        layout.addLayout(date_filter_layout)
+        
         # Buttons Layout
         buttons_layout = QHBoxLayout()
         
@@ -233,28 +315,6 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(buttons_layout)
 
-        # Date Filter Layout
-        date_filter_layout = QHBoxLayout()
-        self.ignore_younger_than_label = QLabel("Ignore files younger than:")
-        self.ignore_younger_than_label.setMargin(10)
-        self.ignore_younger_than_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.ignore_younger_than = QSpinBox()
-        self.ignore_younger_than.setRange(0, 9999)
-        self.ignore_younger_than.setSpecialValueText("Off")
-        self.ignore_younger_than.setSuffix(" days")
-        date_filter_layout.addWidget(self.ignore_younger_than_label)
-        date_filter_layout.addWidget(self.ignore_younger_than)
-        
-        self.ignore_older_than = QSpinBox()
-        self.ignore_older_than_label = QLabel("Ignore files older than:")
-        self.ignore_older_than_label.setMargin(10)
-        self.ignore_older_than_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.ignore_older_than.setRange(0, 9999)
-        self.ignore_older_than.setSpecialValueText("Off")
-        self.ignore_older_than.setSuffix(" days")
-        date_filter_layout.addWidget(self.ignore_older_than_label)
-        date_filter_layout.addWidget(self.ignore_older_than)
-        layout.addLayout(date_filter_layout)
         
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -268,7 +328,7 @@ class MainWindow(QMainWindow):
         self.logfiles_count_statusbar = QStatusBar()
         self.setStatusBar(self.logfiles_count_statusbar)
         self.logfiles_count_statusbar.setSizeGripEnabled(False)
-        self.logfiles_count_statusbar.setStyleSheet("font-size: 16px; font-weight: bold; color: #0c6cd4")
+        self.logfiles_count_statusbar.setStyleSheet("font-size: 16px; font-weight: bold; color: #11d957")
         statusbar_layout.addWidget(self.logfiles_count_statusbar)
         layout.addLayout(statusbar_layout)
         
@@ -326,18 +386,25 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
             
+    def enable_date_filter_state(self):
+        if self.enable_date_filter_checkbox.isChecked():
+            self.zip_files_older_than.setDisabled(False)
+            self.pattern_input.setDisabled(True)
+            if self.pattern_input.text():
+                self.pattern_input.clear()
+        else:
+            self.zip_files_older_than.setDisabled(True)
+            self.pattern_input.setDisabled(False)
+            
     def create_menu_bar(self):
         menu_bar = self.menuBar()
         
-         # File Menu
+        # File Menu
         file_menu = menu_bar.addMenu("&File")
         clear_action = QAction("Clear Output", self)
         clear_action.setStatusTip("Clear the output")
         clear_action.triggered.connect(self.clear_output)
         file_menu.addAction(clear_action)
-        clear_radiobox_action = QAction("Reset Spinboxes", self)
-        clear_radiobox_action.triggered.connect(self.reset_spinboxes)
-        file_menu.addAction(clear_radiobox_action)
         file_menu.addSeparator()
         exit_action = QAction("E&xit", self)
         exit_action.setStatusTip("Exit the application")
@@ -362,11 +429,6 @@ class MainWindow(QMainWindow):
     
     def clear_output(self):
         self.program_output.clear()
-    
-    # Reset both spinboxes to the "Off" special value
-    def reset_spinboxes(self):
-        self.ignore_younger_than.setValue(0)
-        self.ignore_older_than.setValue(0)
         
     def get_compression_method(self):
         combobox_text = self.compression_method_combobox.currentText()
@@ -465,12 +527,13 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         compression_method = self.compression_method_combobox.currentText()
         delete_logfiles_after_zipping = self.delete_logfiles_checkbox.isChecked()
         patterns = [p.strip() for p in self.pattern_input.text().split(',') if p.strip()]
-        ignore_younger_than = self.ignore_younger_than.value() if self.ignore_younger_than.value() > 0 else None
-        ignore_older_than = self.ignore_older_than.value() if self.ignore_older_than.value() > 0 else None
+        date_filter_state = self.enable_date_filter_checkbox.isChecked()
+        zip_files_older_than = self.zip_files_older_than.dateTime().toPython() # datetime object
         
-        if not input_folder or not output_folder or not patterns:
-            QMessageBox.warning(self, "Error", "Please fill in all fields.")
-            return
+        if not date_filter_state:
+            if not input_folder or not output_folder and not patterns:
+                QMessageBox.warning(self, "Error", "Please fill in all fields.")
+                return
         
         if not os.path.exists(input_folder):
             QMessageBox.warning(self, "Input folder is empty", f"Input folder does not exist: {input_folder}")
@@ -481,7 +544,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
 
             # Check the user's response
             if reply == QMessageBox.Yes:
-                try:
+                try: 
                     os.makedirs(output_folder)
                     QMessageBox.information(self, "Success", f"Folder created: {output_folder}")
                 except Exception as ex:
@@ -494,7 +557,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         
         # Set up worker and thread
         self.thread = QThread()
-        self.worker = Worker(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, ignore_younger_than, ignore_older_than)
+        self.worker = Worker(self, input_folder, output_folder, patterns, compression_method, delete_logfiles_after_zipping, date_filter_state, zip_files_older_than)
         self.worker.moveToThread(self.thread)
 
         # Connect signals and slots
@@ -507,7 +570,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         # Start the thread
         self.thread.start()
         
-        # Disable UI elements during procesing
+        # Disable UI elements during processing
         self.set_ui_enabled(False)
         
     def set_ui_enabled(self, enabled):
@@ -518,8 +581,7 @@ Best for: Cases where maximum compression is essential, and speed or memory usag
         self.zip_button.setEnabled(enabled)
         self.compression_method_combobox.setEnabled(enabled)
         self.delete_logfiles_checkbox.setEnabled(enabled)
-        self.ignore_younger_than.setEnabled(enabled)
-        self.ignore_older_than.setEnabled(enabled)
+        self.zip_files_older_than.setEnabled(enabled)
 
     def on_worker_finished(self):
         self.set_ui_enabled(True)

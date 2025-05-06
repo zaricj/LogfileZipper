@@ -1,0 +1,141 @@
+
+QMainWindow {
+    background-color: #2b2b2b;
+    color: #ffffff;
+}
+QWidget {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 12px;
+}
+QLabel {
+    color: #ffffff;
+    font: bold;
+}
+QLineEdit, QTextEdit, QTreeView, QDateTimeEdit {
+    background-color: #3a3a3a;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 2px;
+    color: #ffffff;
+}
+QLineEdit:focus, QTextEdit:focus, QTreeView:focus QDateTimeEdit:focus {
+    border-color: #1855b7;
+    background-color: #3a3a3a;
+}
+QLineEdit:disabled, QTextEdit:disabled, QTreeView:disabled, QDateTimeEdit:disabled {
+    background-color: #808080;
+    border: 1px solid #555555;
+    color: #bdbdbd;
+}
+QComboBox {
+    font-size: 15px;
+    font: bold;
+}
+/* Set style for QCheckBox:  space, font size and font color */
+QCheckBox {
+	spacing: 8px;
+	color: #ffffff;
+    font: bold;
+}
+
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background-color: #313338;
+    border: 1px solid #555555;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #0053d7;
+    border: 1px solid #555555;
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #313338;
+    border: 1px solid #555555;
+}
+
+/* Change font color when mouse is hover on QCheckBox   */
+QCheckBox:hover {
+	color: #0e5fda;
+}
+
+QSpinBox {
+    background-color: #3a3a3a;
+    border: 1px solid #c0c0c0;
+    border-radius: 5px;
+    padding: 2px 5px;
+    min-width: 70px;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #d0d0d0;
+}
+
+QSpinBox::up-button {
+    border-top-right-radius: 3px;
+}
+
+QSpinBox::down-button {
+    border-bottom-right-radius: 3px;
+}
+QPushButton {
+    background-color: #0053d7;
+    color: white;
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+QPushButton:hover {
+    background-color: #1855b7;
+}
+QPushButton:pressed {
+    background-color: #093987;
+    color: #000000;
+}
+QPushButton:disabled {
+    background-color: #808080;
+}
+QTreeView::item:selected {
+    background-color: #1855b7;
+}
+QMenuBar {
+    border-bottom: 2px solid #1855b7;
+    background-color: #2b2b2b;
+    color: #ffffff;
+}
+QMenuBar::item:selected {
+    background-color: #3a3a3a;
+}
+QMenu {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    border: 1px solid #424242;
+    border-radius: 6px;
+}
+QMenu::item:selected {
+    background-color: #1855b7;
+}
+QStatusBar {
+    background-color: #1e1e1e;
+    color: #ffffff;
+}
+QProgressBar {
+    border: 2px solid grey;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 600;
+    font: bold 
+}
+QProgressBar::chunk {
+    background-color: #1959c1;
+    width: 10px;
+    margin: 0.5px
+}

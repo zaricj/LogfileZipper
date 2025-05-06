@@ -12,7 +12,7 @@ print(script_dir)
 
 log_dir = os.path.join(script_dir, "Log")
 log_file = os.path.join(log_dir, "zipping_history.log")
- 
+
 # Create the directory if it doesn't exist
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
@@ -39,11 +39,13 @@ msg = r"""
 \ \/  \/ / | | | |/ / _ \| '_ ` _ \| '_ ` _ \ / _ \ '_ \ 
  \  /\  /| | | |   < (_) | | | | | | | | | | |  __/ | | |
   \/  \/ |_|_|_|_|\_\___/|_| |_| |_|_| |_| |_|\___|_| |_|
-                                                         
+
+-------------------------------------------------------------------------------------------------------------------------
 "Ein CLI-Tool zum Komprimieren von Logdateien im ZIP-Format. 
 Unterstützt werden nur Logdateien, die das Datum im Format yyyy_mm_dd im Dateinamen enthalten. 
 Beispiele für unterstützte Logs: 2024_03_20_server.log, 2024_08_27.adminrequest.log, 2024_08_03_message.log. 
-Die Logdateien werden nach dem Monat im Dateinamen gruppiert und für jeden Monat wird ein separates .zip-Archiv erstellt."    
+Die Logdateien werden nach dem Monat im Dateinamen gruppiert und für jeden Monat wird ein separates .zip-Archiv erstellt."
+-------------------------------------------------------------------------------------------------------------------------
 """
 
 print(msg)
@@ -178,12 +180,12 @@ if not files_grouped_by_month:
         
 else:
 
-   # Zip the files grouped by (year, month)
+    # Zip the files grouped by (year, month)
     for (year, month), group_files in files_grouped_by_month.items():
         zip_filename = f"{year}-{month}.zip"
         zip_path = Path(output_dir) / zip_filename
 
-      # Create the Zip file and add the grouped files to it
+    # Create the Zip file and add the grouped files to it
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_BZIP2) as zipf:
             for file in tqdm(group_files, "Zipping files: "):
                 zipf.write(str(file), arcname=file.name)

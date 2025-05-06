@@ -1,70 +1,67 @@
 
-# LogfileZipper
-This Python script is a command line tool (CLI) for compressing log files in zip format. It only supports log files whose file names contain a date in the format `yyyy_mm_dd`, e.g. `2024_03_20_server.log`. The script groups the log files according to the month in the file name and creates a separate `zip` archive for each month.
+# Log File Zipping Tool
+Dieses Python-Skript ist ein Kommandozeilen-Tool (CLI) zum Komprimieren von Logdateien im 7z-Format. Es unterstützt nur Logdateien, deren Dateinamen ein Datum im Format `yyyy_mm_dd` enthalten, wie z.B. `2024_03_20_server.log`. Das Skript gruppiert die Logdateien nach dem Monat im Dateinamen und erstellt für jeden Monat ein separates `.7z`-Archiv.
 
-## Alternative GUI Version
-The GUI version is more flexible and dynamic, it uses RegEx patterns to search for log filename patterns and groups them by the pattern.
+## Funktionsweise
 
-## Functionality
+- Das Skript durchsucht ein angegebenes Verzeichnis nach Logdateien und komprimiert diese zu `.7z`-Archiven.
+- Die Logdateien werden nach dem Datum im Dateinamen (Jahr und Monat) gruppiert.
+- Es wird für jeden Monat ein Archiv erstellt, das alle zugehörigen Logdateien enthält.
+- Es besteht die Möglichkeit, die ursprünglichen Logdateien nach der Komprimierung zu löschen.
 
-- The script searches a specified directory for log files and compresses them into `.7z` archives.
-- The log files are grouped according to the date in the file name (year and month).
-- An archive is created for each month containing all the associated log files.
-- It is possible to delete the original log files after compression.
+## Voraussetzungen
 
-## Prerequisites
-
-- Python 3.6 or higher
-- Dependencies: `tqdm` (for the progress bar)
+- Python 3.6 oder höher
+- Abhängigkeiten: `tqdm` (für den Fortschrittsbalken)
 
 ## Installation
 
-1. install Python 3.6 or higher.
-2. install Python package `tqdm`:
+1. Python 3.6 oder höher installiern.
+2. Python Package `tqdm` installieren:
 
    ```bash
    pip install tqdm
    ```
 
-## Usage
+## Verwendung
 
-1. execute the script in the terminal/CMD:
+1. Skript im Terminal/CMD ausführen:
    ```bash
    python LogfileZipper.py
    ```
 
-2. follow the prompts:
-   - **Logs directory**: Path of the directory containing the log files to be compressed.
-   - **Target directory**: Path where the compressed archives should be saved (can be the same directory as the logs directory).
-   - Delete log files**: Decision whether the original log files should be deleted after compression.
+2. Befolge die Eingabeaufforderungen:
+   - **Logs-Verzeichnis**: Pfad des Verzeichnisses, das die zu komprimierenden Logdateien enthält.
+   - **Zielverzeichnis**: Pfad, wo die komprimierten Archive gespeichert werden sollen (kann das gleiche Verzeichnis wie das Logs-Verzeichnis sein).
+   - **Löschen der Logdateien**: Entscheidung, ob die Original-Logdateien nach der Komprimierung gelöscht werden sollen.
 
-3. the script displays the progress of compression and logging in the console. The log files are saved under `Log/zipping_history.log`.
+3. Das Skript zeigt den Fortschritt beim Komprimieren und die Protokollierung in der Konsole an. Die Protokolldateien werden unter `Log/zipping_history.log` gespeichert.
 
-## Examples of supported log files
+## Beispiele für unterstützte Logdateien
 
-- 2024_03_20_server.log
+- `2024_03_20_server.log`
 - `2024_08_27.adminrequest.log`
 - `2024_08_03_message.log`
 
-## Logging
+## Protokollierung
 
-The script creates a log directory (`log`) and saves all activities in the file `zipping_history.log`. Both errors and information on the execution of the script are logged.
+Das Skript erstellt ein Protokollverzeichnis (`log`) und speichert alle Aktivitäten in der Datei `zipping_history.log`. Es werden sowohl Fehler als auch Informationen zur Ausführung des Skripts protokolliert.
 
 ## Windows Executable Binary
 
-A GUI version of the script is available under the releases.
+Eine GUI version von dem Skript gibt es unter dem Releases.
 
-Direct download link: [Download LogfileZipper](https://git.de.geis-group.net/-/project/646/uploads/421d41b3658aeab2280b28933334f031/LogfileZipperGUI.7z)
+Direkter download link: [Download LogfileZipper](https://git.de.geis-group.net/-/project/646/uploads/421d41b3658aeab2280b28933334f031/LogfileZipperGUI.7z)
 
-## Troubleshooting
+## Fehlerbehebung
 
-- Make sure that the directory paths entered exist and are valid.
-- Check the permissions to create files and directories.
-- If the script does not find any log files, check whether the file names correspond to the format `yyyyy_mm_dd`.
+- Stelle sicher, dass die eingegebenen Verzeichnispfade existieren und gültig sind.
+- Überprüfe die Berechtigungen zum Erstellen von Dateien und Verzeichnissen.
+- Wenn das Skript keine Logdateien findet, überprüfe, ob die Dateinamen dem Format `yyyy_mm_dd` entsprechen.
 
-## Screenshots and GIFs
+## Screenshots und GIFs
 
-### CLI screenshot
+### CLI Screenshot
 
 ![CLI](docs/images/CLI_Showcase.png)
 
